@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Drawer Organizer</title>
+  <style>
+    :root{--primary:#111827;--accent:#0b1220;--border:#e6edf3;--text:#0f172a;--light:#fbfdff;--ui-width:300px;--ui-margin:12px;--header-height:56px;--footer-height:56px}
+    /* Brand styling: black, no underline, consistent size */
+    .brand-link{color:#111827;text-decoration:none}
+    .brand-link:hover{color:#111827;text-decoration:none}
+    .brand-link strong{font-size:20px;color:#111827}
+    html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#f7fafc}
+
+    .site-header{position:fixed;inset:0 0 auto 0;height:var(--header-height);background:#ffffff;border-bottom:1px solid rgba(2,6,23,0.04);display:flex;align-items:center;justify-content:space-between;padding:0 18px;box-shadow:0 4px 18px rgba(2,6,23,0.06);z-index:10000}
+    .site-header .brand{display:flex;align-items:center;gap:10px}
+    .site-nav a{margin-left:12px;color:#0f172a;text-decoration:none;font-weight:600}
+
+    #ui{position:fixed;top:calc(var(--ui-margin) + var(--header-height));left:var(--ui-margin);z-index:900;pointer-events:auto;box-sizing:border-box;background:rgba(255,255,255,0.95);padding:14px 16px;border-radius:12px;border:1px solid rgba(17,24,39,0.06);box-shadow:0 8px 24px rgba(2,6,23,0.04);width:var(--ui-width);color:var(--text);font-size:14px}
+    #ui .row{display:flex;align-items:center;gap:8px;margin:8px 0}
+    #ui label{width:110px;color:#334155;font-weight:500;font-size:13px}
+    #ui input[type=number]{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--light);color:var(--text);font-size:13px}
+    #ui input[type=number]:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(17,24,39,0.1)}
+
+    button{background:linear-gradient(180deg,var(--primary) 0%,var(--accent) 100%);color:#fff;border:none;padding:8px 12px;border-radius:10px;cursor:pointer;box-shadow:0 6px 18px rgba(15,23,42,0.12);font-weight:600;font-size:13px;transition:all 0.2s}
+    button:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(15,23,42,0.16)}
+    button:active{transform:translateY(0)}
+    button.secondary{background:transparent;color:var(--text);border:1px solid var(--border);box-shadow:none}
+    button.secondary:hover{background:rgba(0,0,0,0.02)}
+
+    #viewer{position:fixed;top:calc(var(--ui-margin) + var(--header-height));right:var(--ui-margin);bottom:calc(var(--ui-margin) + var(--footer-height));left:calc(var(--ui-margin) + var(--ui-width) + var(--ui-margin));background:linear-gradient(180deg,#ffffff 0%,#fbfdff 100%);border-radius:14px;box-shadow:0 20px 50px rgba(2,6,23,0.12);overflow:hidden;z-index:1001}
+    canvas[data-three]{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}
+    #overlay{position:absolute;inset:0;z-index:10;pointer-events:none}
+    #done{position:absolute;right:12px;bottom:12px;z-index:20;padding:8px 12px;border-radius:10px;font-weight:700}
+
+    @media (max-width:1200px){:root{--ui-width:280px;--ui-margin:10px}}
+    @media (max-width:900px){:root{--ui-width:260px;--ui-margin:10px}#ui{font-size:13px;padding:12px 14px}#ui label{width:95px;font-size:12px}}
+    @media (max-width:768px){:root{--ui-width:240px}#ui input[type=number]{font-size:12px}}
+    @media (max-width:480px){:root{--ui-width:220px;--ui-margin:8px}#ui{padding:10px 12px}button{padding:6px 10px;font-size:12px}}
+  </style>
+  <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
+</head>
+<body>
+  <div class="site-header">
+    <div class="brand"><a href="../index.html" class="brand-link"><strong style="margin:0">Print Shop</strong></a><div style="color:#64748b">— Drawer Organizer</div></div>
+    <nav class="site-nav"><a href="../index.html">Home</a><a href="./index.html">Drawer</a></nav>
+  </div>
+
+  <div id="ui">
+    <div class="row" style="justify-content:space-between;">
+      <div><strong>Drawer Organizer</strong> <span id="modeBadge">3D</span></div>
+      <button id="toggleDraw">Draw</button>
+    </div>
+    <div class="row"><label>Width (mm)</label><input id="w" type="number" value="300" min="50" max="2000"></div>
+    <div class="row"><label>Depth (mm)</label><input id="d" type="number" value="400" min="50" max="2000"></div>
+    <div class="row"><label>Height (mm)</label><input id="h" type="number" value="60" min="10" max="500"></div>
+    <div class="row"><label>Wall (mm)</label><input id="t" type="number" value="3" min="1" max="20" step="0.5"></div>
+    <div class="row"><label>Divider thickness (mm)</label><input id="td" type="number" value="3" min="0.5" max="20" step="0.5"></div>
+    <div class="row"><label>Grid (mm)</label><input id="grid" type="number" value="50" min="1" max="200"></div>
+    <div class="row" style="gap:10px;"><button id="apply">Apply</button><button id="undo" class="secondary">Undo</button><button id="clear" class="secondary">Clear</button></div>
+  </div>
+  <div id="viewer"><canvas id="overlay"></canvas><button id="done">Export STL</button></div>
+
+  <div class="site-footer" style="position:fixed;left:0;right:0;bottom:0;height:var(--footer-height);background:#fff;border-top:1px solid rgba(2,6,23,0.04);display:flex;align-items:center;justify-content:center;gap:12px;z-index:10000">
+    <div style="color:#475569">Built from the Drawer Organizer prototype.</div>
+    <nav><a href="../impressum.html">Impressum</a> · <a href="../kontakt.html">Kontakt</a></nav>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+    import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+    // ===== HELPERS =====
+    const mmToWorld = (mm) => mm * 0.001;
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const snap = (v, g) => Math.round(v / g) * g;
+    const EPS = 1e-6;
+
+    // Centralized input parsing
+    const parseInput = (el, def, min, max) => {
+      const val = Number(el.value || def);
+      return clamp(isNaN(val) ? def : val, min, max);
+    };
+
+    // gcd / divisor helpers for grid validity
+    function gcd(a, b) {
+      a = Math.abs(Math.floor(a)); b = Math.abs(Math.floor(b));
+      while (b) {
+        const t = a % b; a = b; b = t;
+      }
+      return Math.max(1, a);
+    }
+
+    function divisors(n) {
+      const out = [];
+      for (let i = 1; i * i <= n; i++) {
+        if (n % i === 0) {
+          out.push(i);
+          if (i !== n / i) out.push(n / i);
+        }
+      }
+      return out.sort((x, y) => x - y);
+    }
+
+    function nearestDivisor(target, n) {
+      const divs = divisors(n);
+      if (divs.length === 0) return 1;
+      let best = divs[0];
+      let bestDiff = Math.abs(best - target);
+      for (const d of divs) {
+        const diff = Math.abs(d - target);
+        if (diff < bestDiff || (diff === bestDiff && d > best)) {
+          best = d; bestDiff = diff;
+        }
+      }
+      return best;
+    }
+
+    // ===== STATE =====
+    const state = {
+      W: 300, D: 400, H: 60, T: 3, GRID: 50, dividerT: 3,
+      dividers: [],
+      drawMode: false,
+      pendingPoint: null,
+    };
+
+    // ===== DOM =====
+    const el = {
+      w: document.getElementById("w"),
+      d: document.getElementById("d"),
+      h: document.getElementById("h"),
+      t: document.getElementById("t"),
+      td: document.getElementById("td"),
+      grid: document.getElementById("grid"),
+      apply: document.getElementById("apply"),
+      undo: document.getElementById("undo"),
+      clear: document.getElementById("clear"),
+      toggleDraw: document.getElementById("toggleDraw"),
+      badge: document.getElementById("modeBadge"),
+      overlay: document.getElementById("overlay"),
+      done: document.getElementById("done"),
+      viewer: document.getElementById("viewer"),
+    };
+
+    function readInputs() {
+      state.W = parseInput(el.w, 300, 50, 2000);
+      state.D = parseInput(el.d, 400, 50, 2000);
+      state.H = parseInput(el.h, 60, 10, 500);
+      state.T = parseInput(el.t, 3, 1, 20);
+      // divider thickness separate from drawer wall thickness
+      state.dividerT = parseInput(el.td, 3, 0.5, 20);
+      // parse requested grid but restrict to divisors that evenly fit both W and D
+      const requestedGrid = parseInput(el.grid, 50, 1, 200);
+      const g = gcd(state.W, state.D);
+      // find the nearest divisor of g to the requestedGrid
+      const valid = nearestDivisor(requestedGrid, g);
+      state.GRID = clamp(valid, 1, 200);
+
+      el.w.value = state.W;
+      el.d.value = state.D;
+      el.h.value = state.H;
+      el.t.value = state.T;
+      el.td.value = state.dividerT;
+      el.grid.value = state.GRID;
+    }
+
+    // ===== THREE.JS SETUP =====
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.domElement.setAttribute("data-three", "1");
+    el.viewer.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf3f4f6);
+
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100);
+    camera.position.set(0.45, 0.35, 0.55);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 1.0));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+    dir.position.set(1, 2, 1);
+    scene.add(dir);
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(5, 5),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.001;
+    scene.add(ground);
+
+    const drawerGroup = new THREE.Group();
+    const dividerGroup = new THREE.Group();
+    scene.add(drawerGroup);
+    scene.add(dividerGroup);
+
+    const matBase = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0.0 });
+    const matWall = new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.9, metalness: 0.0, side: THREE.DoubleSide });
+    const matDivider = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.7, metalness: 0.0 });
+    const matOutline = new THREE.LineBasicMaterial({ color: 0x111827 });
+
+    // ===== GEOMETRY MANAGEMENT =====
+    function clearGroup(g) {
+      while (g.children.length) {
+        const obj = g.children.pop();
+        obj.geometry?.dispose?.();
+        if (obj.material && Array.isArray(obj.material)) obj.material.forEach(m => m.dispose?.());
+        else obj.material?.dispose?.();
+      }
+    }
+
+    function buildDrawer() {
+      clearGroup(drawerGroup);
+      const W = mmToWorld(state.W), D = mmToWorld(state.D), H = mmToWorld(state.H), wall = mmToWorld(state.T);
+
+      const base = new THREE.Mesh(new THREE.BoxGeometry(W, wall, D), matBase);
+      base.position.set(0, wall/2, 0);
+      drawerGroup.add(base);
+
+      const wallLong = new THREE.BoxGeometry(W, H, wall);
+      const wallShort = new THREE.BoxGeometry(wall, H, D);
+
+      const north = new THREE.Mesh(wallLong, matWall);
+      north.position.set(0, H/2, -D/2 + wall/2);
+      drawerGroup.add(north);
+
+      const south = new THREE.Mesh(wallLong, matWall);
+      south.position.set(0, H/2, D/2 - wall/2);
+      drawerGroup.add(south);
+
+      const west = new THREE.Mesh(wallShort, matWall);
+      west.position.set(-W/2 + wall/2, H/2, 0);
+      drawerGroup.add(west);
+
+      const east = new THREE.Mesh(wallShort, matWall);
+      east.position.set(W/2 - wall/2, H/2, 0);
+      drawerGroup.add(east);
+
+      const pts = [
+        new THREE.Vector3(-W/2, H + 0.0005, -D/2),
+        new THREE.Vector3( W/2, H + 0.0005, -D/2),
+        new THREE.Vector3( W/2, H + 0.0005,  D/2),
+        new THREE.Vector3(-W/2, H + 0.0005,  D/2),
+        new THREE.Vector3(-W/2, H + 0.0005, -D/2),
+      ];
+      const geom = new THREE.BufferGeometry().setFromPoints(pts);
+      const line = new THREE.Line(geom, matOutline);
+      drawerGroup.add(line);
+    }
+
+    function buildDividers() {
+      clearGroup(dividerGroup);
+      const W = state.W, D = state.D, H = state.H;
+      const Tdiv = state.dividerT || state.T;
+      const buffer = Math.max(1, state.T);
+
+      const endpointMap = new Map();
+      const allDividers = state.dividers; // keep reference for meeting-point geometry
+
+      for (const dv of state.dividers) {
+        const x1 = dv.x1 - W/2, z1 = dv.z1 - D/2;
+        const x2 = dv.x2 - W/2, z2 = dv.z2 - D/2;
+        const dx = x2 - x1, dz = z2 - z1;
+        const len = Math.hypot(dx, dz);
+        if (len < 1) continue;
+
+        const lenW = mmToWorld(len);
+        const thick = mmToWorld(Tdiv);
+        const height = mmToWorld(H);
+
+        const geom = new THREE.BoxGeometry(lenW, height, thick);
+        const mesh = new THREE.Mesh(geom, matDivider);
+        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
+        mesh.position.set(mmToWorld(mx), height/2, mmToWorld(mz));
+        mesh.rotation.y = -Math.atan2(dz, dx);
+        dividerGroup.add(mesh);
+
+        const pts = [
+          new THREE.Vector3(mmToWorld(x1), mmToWorld(H) + 0.0008, mmToWorld(z1)),
+          new THREE.Vector3(mmToWorld(x2), mmToWorld(H) + 0.0008, mmToWorld(z2)),
+        ];
+        const lg = new THREE.BufferGeometry().setFromPoints(pts);
+        dividerGroup.add(new THREE.Line(lg, matOutline));
+        // collect endpoints for post-processing
+        const ang1 = Math.atan2(dz, dx);
+        const ang2 = Math.atan2(-dz, -dx);
+        const endpoints = [ { x: dv.x1, z: dv.z1, ang: ang1 }, { x: dv.x2, z: dv.z2, ang: ang2 } ];
+        for (const ep of endpoints) {
+          const key = `${Math.round(ep.x)}|${Math.round(ep.z)}`;
+          const existing = endpointMap.get(key) || { x: ep.x, z: ep.z, count: 0, touchesX: false, touchesZ: false, angles: [], dividerIndices: [] };
+          existing.count += 1;
+          const onLeft = Math.abs(ep.x - buffer) < 1e-6;
+          const onRight = Math.abs(ep.x - (W - buffer)) < 1e-6;
+          const onTop = Math.abs(ep.z - buffer) < 1e-6;
+          const onBottom = Math.abs(ep.z - (D - buffer)) < 1e-6;
+          if (onLeft || onRight) existing.touchesX = true;
+          if (onTop || onBottom) existing.touchesZ = true;
+          existing.angles.push(ep.ang);
+          endpointMap.set(key, existing);
+        }
+      }
+
+      // helper: classify angle as axis-aligned (H/V) or diagonal
+      const normalize = a => { let n = a % (Math.PI / 2); return n < 0 ? n + Math.PI / 2 : n; };
+      const isAxisAligned = (n) => Math.abs(n) < 0.2 || Math.abs(n - Math.PI / 2) < 0.2;
+      const isDiagonal = (n) => Math.abs(n - Math.PI / 4) < 0.2;
+
+      // process collected endpoints: fill meeting gaps with polygon or square cap
+      for (const [, ep] of endpointMap) {
+        const touchesX = ep.touchesX;
+        const touchesZ = ep.touchesZ;
+        const isMeeting = ep.count >= 2;
+        const size_mm = Tdiv;
+        const height = mmToWorld(H);
+
+        if (isMeeting) {
+          const angles = ep.angles || [];
+          const normalized = angles.map(normalize);
+          const axisCount = normalized.filter(isAxisAligned).length;
+          const diagCount = normalized.filter(isDiagonal).length;
+
+          // if all same alignment (all axis or all diagonal), use square cap
+          if ((axisCount === angles.length) || (diagCount === angles.length)) {
+            const size = mmToWorld(size_mm);
+            const capGeom = new THREE.BoxGeometry(size, height, size);
+            const cap = new THREE.Mesh(capGeom, matDivider);
+            let capRotY = 0;
+            if (diagCount === angles.length) {
+              let sx = 0, sy = 0;
+              for (const a of angles) { sx += Math.cos(a); sy += Math.sin(a); }
+              const mean = Math.atan2(sy, sx);
+              capRotY = -mean + Math.PI / 4;
+            }
+            cap.rotation.y = capRotY;
+            cap.position.set(mmToWorld(ep.x - W/2), height/2, mmToWorld(ep.z - D/2));
+            dividerGroup.add(cap);
+            continue;
+          }
+
+          // mixed alignment: create a gap-filling polygon by connecting the outer corners of meeting dividers
+          // collect the dividers that meet at this endpoint
+          const meetingDvs = [];
+          for (let i = 0; i < allDividers.length; i++) {
+            const dv = allDividers[i];
+            const distToStart = Math.hypot(dv.x1 - ep.x, dv.z1 - ep.z);
+            const distToEnd = Math.hypot(dv.x2 - ep.x, dv.z2 - ep.z);
+            if (distToStart < 1 || distToEnd < 1) meetingDvs.push({ dv, i });
+          }
+
+          if (meetingDvs.length >= 2) {
+            // collect offset points (two per divider) around the meeting endpoint
+            const rawPts = [];
+            for (const { dv } of meetingDvs) {
+              const dx = dv.x2 - dv.x1, dz = dv.z2 - dv.z1;
+              const l = Math.hypot(dx, dz);
+              if (l < 1e-6) continue;
+              const perpX = -dz / l * (Tdiv / 2), perpZ = dx / l * (Tdiv / 2);
+              rawPts.push({ x: ep.x + perpX, z: ep.z + perpZ });
+              rawPts.push({ x: ep.x - perpX, z: ep.z - perpZ });
+            }
+
+            // dedupe points
+            const uniq = [];
+            for (const p of rawPts) {
+              if (!uniq.some(u => Math.hypot(u.x - p.x, u.z - p.z) < 1e-4)) uniq.push(p);
+            }
+
+            // if not enough unique points, fallback to simple box cap
+            if (uniq.length < 3) {
+              const size = mmToWorld(size_mm);
+              const capGeom = new THREE.BoxGeometry(size, height, size);
+              const cap = new THREE.Mesh(capGeom, matDivider);
+              cap.position.set(mmToWorld(ep.x - W/2), height / 2, mmToWorld(ep.z - D/2));
+              dividerGroup.add(cap);
+            } else {
+              // compute centroid and sort by angle
+              const center = uniq.reduce((acc, p) => (acc.x += p.x, acc.z += p.z, acc), { x: 0, z: 0 });
+              center.x /= uniq.length; center.z /= uniq.length;
+              uniq.sort((a, b) => Math.atan2(a.z - center.z, a.x - center.x) - Math.atan2(b.z - center.z, b.x - center.x));
+
+              const n = uniq.length;
+              const positions = [];
+              const indices = [];
+
+              // bottom verts (y=0)
+              for (let i = 0; i < n; i++) positions.push(mmToWorld(uniq[i].x - W/2), 0, mmToWorld(uniq[i].z - D/2));
+              // top verts (y=height)
+              for (let i = 0; i < n; i++) positions.push(mmToWorld(uniq[i].x - W/2), height, mmToWorld(uniq[i].z - D/2));
+
+              // bottom triangulation (fan)
+              for (let i = 1; i < n - 1; i++) indices.push(0, i + 1, i);
+              // top triangulation (fan)
+              const topOff = n;
+              for (let i = 1; i < n - 1; i++) indices.push(topOff, topOff + i, topOff + i + 1);
+
+              // side faces
+              for (let i = 0; i < n; i++) {
+                const next = (i + 1) % n;
+                const a = i, b = next, c = next + n, d = i + n;
+                indices.push(a, b, d);
+                indices.push(b, c, d);
+              }
+
+              const fillGeom = new THREE.BufferGeometry();
+              fillGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+              fillGeom.setIndex(new THREE.BufferAttribute(new Uint16Array(indices), 1));
+              fillGeom.computeVertexNormals();
+
+              // groups: bottom, top, sides
+              const bottomCount = (n - 2) * 3;
+              const topCount = (n - 2) * 3;
+              const sidesCount = indices.length - bottomCount - topCount;
+              fillGeom.clearGroups();
+              fillGeom.addGroup(0, bottomCount, 0);
+              fillGeom.addGroup(bottomCount, topCount, 1);
+              fillGeom.addGroup(bottomCount + topCount, sidesCount, 2);
+
+              const matDividerOffset = matDivider.clone();
+              matDividerOffset.polygonOffset = true;
+              matDividerOffset.polygonOffsetFactor = 1.0;
+              matDividerOffset.polygonOffsetUnits = 1.0;
+              matDividerOffset.side = THREE.DoubleSide;
+              const matWallTop = matWall.clone();
+              matWallTop.polygonOffset = true;
+              matWallTop.polygonOffsetFactor = 1.0;
+              matWallTop.polygonOffsetUnits = 1.0;
+              matWallTop.side = THREE.DoubleSide;
+              const materials = [matDividerOffset, matWallTop, matDividerOffset];
+
+              const filler = new THREE.Mesh(fillGeom, materials);
+              dividerGroup.add(filler);
+            }
+          }
+        }
+
+        // single endpoint: if it touches wall edges, add L-shaped extension
+        if (touchesX || touchesZ) {
+          const onLeft = Math.abs(ep.x - buffer) < 1e-6;
+          const onRight = Math.abs(ep.x - (W - buffer)) < 1e-6;
+          const onTop = Math.abs(ep.z - buffer) < 1e-6;
+          const onBottom = Math.abs(ep.z - (D - buffer)) < 1e-6;
+
+          const sizeX_mm = touchesX ? Math.max(state.T, Tdiv) : Tdiv;
+          const sizeZ_mm = touchesZ ? Math.max(state.T, Tdiv) : Tdiv;
+          const sizeX = mmToWorld(sizeX_mm);
+          const sizeZ = mmToWorld(sizeZ_mm);
+
+          let cx_mm = ep.x;
+          if (onLeft) cx_mm += sizeX_mm / 2;
+          else if (onRight) cx_mm -= sizeX_mm / 2;
+          let cz_mm = ep.z;
+          if (onTop) cz_mm += sizeZ_mm / 2;
+          else if (onBottom) cz_mm -= sizeZ_mm / 2;
+
+          const capGeom = new THREE.BoxGeometry(sizeX, height, sizeZ);
+          const cap = new THREE.Mesh(capGeom, matDivider);
+          cap.position.set(mmToWorld(cx_mm - W / 2), height / 2, mmToWorld(cz_mm - D / 2));
+          dividerGroup.add(cap);
+        }
+      }
+    }
+
+    function rebuildAll() {
+      buildDrawer();
+      buildDividers();
+      updateOverlay();
+      controls.target.set(0, mmToWorld(state.H)/2, 0);
+    }
+
+    // ===== OVERLAY DRAWING =====
+    const octx = el.overlay.getContext("2d");
+
+    function getViewerRect() {
+      return el.viewer.getBoundingClientRect();
+    }
+
+    function resizeOverlay() {
+      const rect = getViewerRect();
+      const w = Math.max(2, Math.floor(rect.width));
+      const h = Math.max(2, Math.floor(rect.height));
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+
+      el.overlay.width = w * devicePixelRatio;
+      el.overlay.height = h * devicePixelRatio;
+      el.overlay.style.width = w + "px";
+      el.overlay.style.height = h + "px";
+      octx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      updateOverlay();
+    }
+
+    function setDrawMode(on) {
+      state.drawMode = on;
+      el.overlay.style.pointerEvents = on ? "auto" : "none";
+      el.badge.textContent = on ? "DRAW" : "3D";
+      el.toggleDraw.textContent = on ? "Exit" : "Draw";
+      state.pendingPoint = null;
+      updateOverlay();
+    }
+
+    function worldToScreen(v3) {
+      const rect = getViewerRect();
+      const v = v3.clone().project(camera);
+      const rawX = (v.x * 0.5 + 0.5) * rect.width;
+      const rawY = (-(v.y * 0.5) + 0.5) * rect.height;
+      const d = devicePixelRatio || 1;
+      return { x: Math.round(rawX * d) / d, y: Math.round(rawY * d) / d };
+    }
+
+    function mmToWorldTop(x_mm, z_mm, y_mm = state.H) {
+      const x = mmToWorld(x_mm - state.W/2);
+      const z = mmToWorld(z_mm - state.D/2);
+      const y = mmToWorld(y_mm);
+      return new THREE.Vector3(x, y, z);
+    }
+
+    function updateOverlay() {
+      const rect = getViewerRect();
+      octx.clearRect(0, 0, rect.width, rect.height);
+      if (!state.drawMode) return;
+
+      const corners = [
+        mmToWorldTop(0, 0),
+        mmToWorldTop(state.W, 0),
+        mmToWorldTop(state.W, state.D),
+        mmToWorldTop(0, state.D),
+      ].map(worldToScreen);
+
+      octx.lineWidth = 1;
+      octx.strokeStyle = "rgba(17,24,39,0.22)";
+      octx.beginPath();
+      octx.moveTo(corners[0].x, corners[0].y);
+      for (let i=1;i<corners.length;i++) octx.lineTo(corners[i].x, corners[i].y);
+      octx.closePath();
+      octx.stroke();
+
+      octx.lineWidth = 1;
+      octx.strokeStyle = "rgba(17,24,39,0.09)";
+      for (let gx = 0; gx <= state.W + 0.0001; gx += state.GRID) {
+        const a = worldToScreen(mmToWorldTop(gx, 0));
+        const b = worldToScreen(mmToWorldTop(gx, state.D));
+        octx.beginPath();
+        octx.moveTo(a.x, a.y);
+        octx.lineTo(b.x, b.y);
+        octx.stroke();
+      }
+      for (let gz = 0; gz <= state.D + 0.0001; gz += state.GRID) {
+        const a = worldToScreen(mmToWorldTop(0, gz));
+        const b = worldToScreen(mmToWorldTop(state.W, gz));
+        octx.beginPath();
+        octx.moveTo(a.x, a.y);
+        octx.lineTo(b.x, b.y);
+        octx.stroke();
+      }
+
+      octx.lineWidth = 3;
+      octx.strokeStyle = "rgba(75,85,99,0.85)";
+      for (const dv of state.dividers) {
+        const a = worldToScreen(mmToWorldTop(dv.x1, dv.z1));
+        const b = worldToScreen(mmToWorldTop(dv.x2, dv.z2));
+        octx.beginPath();
+        octx.moveTo(a.x, a.y);
+        octx.lineTo(b.x, b.y);
+        octx.stroke();
+      }
+
+      if (state.pendingPoint) {
+        const p = worldToScreen(mmToWorldTop(state.pendingPoint.x, state.pendingPoint.z));
+        octx.fillStyle = "rgba(239,68,68,0.9)";
+        octx.beginPath();
+        octx.arc(p.x, p.y, 5, 0, Math.PI*2);
+        octx.fill();
+      }
+    }
+
+    // ===== RAYCAST + PICKING =====
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    function getTopPlaneHit(clientX, clientY) {
+      const rect = getViewerRect();
+      const lx = clientX - rect.left;
+      const ly = clientY - rect.top;
+      mouse.x = (lx / rect.width) * 2 - 1;
+      mouse.y = -(ly / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const planeY = mmToWorld(state.H);
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
+      const hit = new THREE.Vector3();
+      const ok = raycaster.ray.intersectPlane(plane, hit);
+      if (!ok) return null;
+
+      const x_mm = (hit.x / 0.001) + state.W/2;
+      const z_mm = (hit.z / 0.001) + state.D/2;
+      const buffer = Math.max(1, state.T);
+      const x = clamp(x_mm, buffer, state.W - buffer);
+      const z = clamp(z_mm, buffer, state.D - buffer);
+      const gx = snap(x, state.GRID);
+      const gz = snap(z, state.GRID);
+      return { x: clamp(gx, buffer, state.W - buffer), z: clamp(gz, buffer, state.D - buffer) };
+    }
+
+    // ===== DIVIDER LOGIC =====
+    function addDividerWithGaps(a, b) {
+      const newSeg = { x1: a.x, z1: a.z, x2: b.x, z2: b.z };
+      const minLen = Math.max(1, state.GRID * 0.5);
+
+      const pointOn = (seg, t) => ({ x: seg.x1 + (seg.x2 - seg.x1) * t, z: seg.z1 + (seg.z2 - seg.z1) * t });
+
+      const projT = (A, P) => {
+        const rx = A.x2 - A.x1, rz = A.z2 - A.z1;
+        const len2 = rx*rx + rz*rz;
+        if (len2 < EPS) return 0;
+        return ((P.x - A.x1) * rx + (P.z - A.z1) * rz) / len2;
+      };
+
+      const newRemIntervals = [];
+      const newExisting = [];
+
+      for (let i = 0; i < state.dividers.length; i++) {
+        const dv = state.dividers[i];
+        const r = { x: newSeg.x2 - newSeg.x1, z: newSeg.z2 - newSeg.z1 };
+        const s = { x: dv.x2 - dv.x1, z: dv.z2 - dv.z1 };
+        const rxs = r.x * s.z - r.z * s.x;
+        if (Math.abs(rxs) > EPS) {
+          newExisting.push(dv);
+          continue;
+        }
+
+        const q_p = { x: dv.x1 - newSeg.x1, z: dv.z1 - newSeg.z1 };
+        const cross = q_p.x * r.z - q_p.z * r.x;
+        if (Math.abs(cross) > EPS) {
+          newExisting.push(dv);
+          continue;
+        }
+
+        const t0 = projT(newSeg, { x: dv.x1, z: dv.z1 });
+        const t1 = projT(newSeg, { x: dv.x2, z: dv.z2 });
+        const tt0 = Math.min(t0, t1), tt1 = Math.max(t0, t1);
+        const overlapT0 = Math.max(0, tt0);
+        const overlapT1 = Math.min(1, tt1);
+        if (overlapT1 <= overlapT0 + 1e-5) {
+          newExisting.push(dv);
+          continue;
+        }
+
+        const u0 = projT(dv, pointOn(newSeg, overlapT0));
+        const u1 = projT(dv, pointOn(newSeg, overlapT1));
+        const uu0 = Math.max(0, Math.min(1, Math.min(u0, u1)));
+        const uu1 = Math.max(0, Math.min(1, Math.max(u0, u1)));
+
+        const parts = [];
+        if (uu0 > 0.001) {
+          parts.push({ x1: dv.x1, z1: dv.z1, x2: dv.x1 + (dv.x2 - dv.x1) * uu0, z2: dv.z1 + (dv.z2 - dv.z1) * uu0 });
+        }
+        if (uu1 < 0.999) {
+          parts.push({ x1: dv.x1 + (dv.x2 - dv.x1) * uu1, z1: dv.z1 + (dv.z2 - dv.z1) * uu1, x2: dv.x2, z2: dv.z2 });
+        }
+        for (const p of parts) {
+          if (Math.hypot(p.x2 - p.x1, p.z2 - p.z1) >= minLen) newExisting.push(p);
+        }
+
+        newRemIntervals.push([overlapT0, overlapT1]);
+      }
+
+      let keepIntervals = [[0,1]];
+      const subtract = (keepers, rem) => {
+        const out = [];
+        for (const k of keepers) {
+          const a = k[0], b = k[1];
+          const r0 = rem[0], r1 = rem[1];
+          if (r1 <= a + 1e-6 || r0 >= b - 1e-6) {
+            out.push([a,b]);
+            continue;
+          }
+          if (r0 > a + 1e-6) out.push([a, Math.max(a, r0)]);
+          if (r1 < b - 1e-6) out.push([Math.min(b, r1), b]);
+        }
+        return out;
+      };
+
+      for (const rem of newRemIntervals) keepIntervals = subtract(keepIntervals, rem);
+
+      const addNew = [];
+      const dx = newSeg.x2 - newSeg.x1, dz = newSeg.z2 - newSeg.z1;
+      for (const it of keepIntervals) {
+        const aT = it[0], bT = it[1];
+        const seg = { x1: newSeg.x1 + dx * aT, z1: newSeg.z1 + dz * aT, x2: newSeg.x1 + dx * bT, z2: newSeg.z1 + dz * bT };
+        if (Math.hypot(seg.x2 - seg.x1, seg.z2 - seg.z1) >= minLen) addNew.push(seg);
+      }
+
+      state.dividers = newExisting.concat(addNew);
+    }
+
+    // ===== INPUT HANDLING =====
+    el.overlay.addEventListener("pointerdown", (e) => {
+      if (!state.drawMode) return;
+
+      if (e.button === 0) {
+        const pd = new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          pointerId: e.pointerId,
+          pointerType: e.pointerType,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          button: 0,
+          buttons: e.buttons,
+        });
+        renderer.domElement.dispatchEvent(pd);
+        return;
+      }
+
+      if (e.button !== 2) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const hit = getTopPlaneHit(e.clientX, e.clientY);
+      if (!hit) return;
+
+      if (!state.pendingPoint) {
+        state.pendingPoint = hit;
+        updateOverlay();
+        return;
+      }
+
+      const a = state.pendingPoint, b = hit;
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      if (len >= state.GRID * 0.5) {
+        addDividerWithGaps(a, b);
+        buildDividers();
+      }
+
+      state.pendingPoint = null;
+      updateOverlay();
+    });
+
+    el.overlay.addEventListener('wheel', (e) => {
+      if (!state.drawMode) return;
+      const we = new WheelEvent('wheel', {
+        bubbles: true,
+        cancelable: true,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        deltaX: e.deltaX,
+        deltaY: e.deltaY,
+        deltaZ: e.deltaZ,
+        deltaMode: e.deltaMode,
+      });
+      renderer.domElement.dispatchEvent(we);
+    }, { passive: false });
+
+    el.overlay.addEventListener('contextmenu', (e) => {
+      if (state.drawMode) e.preventDefault();
+    });
+
+    // ===== UI ACTIONS =====
+    el.apply.addEventListener("click", () => {
+      readInputs();
+      state.dividers = state.dividers.map(dv => ({
+        x1: clamp(dv.x1, 0, state.W),
+        z1: clamp(dv.z1, 0, state.D),
+        x2: clamp(dv.x2, 0, state.W),
+        z2: clamp(dv.z2, 0, state.D),
+      }));
+      rebuildAll();
+    });
+
+    el.undo.addEventListener("click", () => {
+      if (state.pendingPoint) state.pendingPoint = null;
+      else state.dividers.pop();
+      buildDividers();
+      updateOverlay();
+    });
+
+    el.clear.addEventListener("click", () => {
+      state.pendingPoint = null;
+      state.dividers = [];
+      buildDividers();
+      updateOverlay();
+    });
+
+    el.toggleDraw.addEventListener("click", () => setDrawMode(!state.drawMode));
+
+    addEventListener("resize", () => resizeOverlay());
+
+    // ===== INIT =====
+    readInputs();
+    rebuildAll();
+    resizeOverlay();
+
+    // ===== STL EXPORT =====
+    el.done.addEventListener('click', () => {
+      let stl = 'solid dividers\n';
+      const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+      const tmp = new THREE.Vector3();
+
+      for (const obj of dividerGroup.children) {
+        if (!(obj instanceof THREE.Mesh)) continue;
+        const geom = obj.geometry;
+        if (!geom) continue;
+        const pos = geom.getAttribute('position');
+        const idx = geom.index;
+        if (idx) {
+          for (let i = 0; i < idx.count; i += 3) {
+            const a = idx.getX(i), b = idx.getX(i+1), c = idx.getX(i+2);
+            vA.fromBufferAttribute(pos, a).applyMatrix4(obj.matrixWorld);
+            vB.fromBufferAttribute(pos, b).applyMatrix4(obj.matrixWorld);
+            vC.fromBufferAttribute(pos, c).applyMatrix4(obj.matrixWorld);
+            const n = new THREE.Vector3();
+            n.subVectors(vB, vA).cross(tmp.subVectors(vC, vA)).normalize();
+            stl += ` facet normal ${n.x} ${n.y} ${n.z}\n  outer loop\n`;
+            stl += `   vertex ${vA.x} ${vA.y} ${vA.z}\n`;
+            stl += `   vertex ${vB.x} ${vB.y} ${vB.z}\n`;
+            stl += `   vertex ${vC.x} ${vC.y} ${vC.z}\n`;
+            stl += `  endloop\n endfacet\n`;
+          }
+        } else {
+          for (let i = 0; i < pos.count; i += 9) {
+            vA.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(obj.matrixWorld);
+            vB.set(pos.getX(i+3), pos.getY(i+3), pos.getZ(i+3)).applyMatrix4(obj.matrixWorld);
+            vC.set(pos.getX(i+6), pos.getY(i+6), pos.getZ(i+6)).applyMatrix4(obj.matrixWorld);
+            const n = new THREE.Vector3();
+            n.subVectors(vB, vA).cross(tmp.subVectors(vC, vA)).normalize();
+            stl += ` facet normal ${n.x} ${n.y} ${n.z}\n  outer loop\n`;
+            stl += `   vertex ${vA.x} ${vA.y} ${vA.z}\n`;
+            stl += `   vertex ${vB.x} ${vB.y} ${vB.z}\n`;
+            stl += `   vertex ${vC.x} ${vC.y} ${vC.z}\n`;
+            stl += `  endloop\n endfacet\n`;
+          }
+        }
+      }
+      stl += 'endsolid dividers\n';
+      const blob = new Blob([stl], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'dividers.stl';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // ===== RENDER LOOP =====
+    function tick() {
+      controls.update();
+      if (state.drawMode) updateOverlay();
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    }
+    tick();
+  </script>
+</body>
+</html>
